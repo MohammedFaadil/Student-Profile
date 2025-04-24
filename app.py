@@ -1,6 +1,6 @@
 import streamlit as st
 from auth import signup_user, login_user, check_user_exists
-from profile_utils import save_profile, load_profiles, display_profile
+from profile_utils import save_profile, load_profiles, load_all_profiles, display_profile
 import os
 
 st.set_page_config(page_title="Student Profile App", layout="centered")
@@ -38,7 +38,10 @@ def login_page():
 # Main App
 def main_app():
     st.sidebar.success(f"Logged in as: {st.session_state.username}")
-    menu = st.sidebar.selectbox("Navigation", ["Create Profile", "View Profile", "Logout"])
+    menu = st.sidebar.selectbox(
+        "Navigation",
+        ["Create Profile", "View Profile", "View All Profiles", "Logout"]
+    )
 
     if menu == "Create Profile":
         st.header("📘 Create Your Profile")
@@ -57,7 +60,11 @@ def main_app():
             submitted = st.form_submit_button("Save Profile")
 
             if submitted:
-                save_profile(st.session_state.username, name, email, phone, degree, institute, graduation_year, projects, skills, certificates, linkedin, github)
+                save_profile(
+                    st.session_state.username, name, email, phone, degree,
+                    institute, graduation_year, projects, skills,
+                    certificates, linkedin, github
+                )
                 st.success("✅ Profile saved!")
 
     elif menu == "View Profile":
@@ -67,6 +74,14 @@ def main_app():
             st.info("No profile found. Create one first.")
         else:
             display_profile(df.iloc[-1])
+
+    elif menu == "View All Profiles":
+        st.header("👥 All Student Profiles")
+        all_profiles = load_all_profiles()
+        if all_profiles.empty:
+            st.info("No profiles found.")
+        else:
+            st.dataframe(all_profiles)
 
     elif menu == "Logout":
         st.session_state.logged_in = False
@@ -78,3 +93,4 @@ if st.session_state.logged_in:
     main_app()
 else:
     login_page()
+
