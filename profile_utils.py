@@ -1,55 +1,95 @@
-import pandas as pd
-import os
 import streamlit as st
+from auth import signup_user, login_user, check_user_exists
+from profile_utils import save_profile, load_profiles, load_all_profiles, display_profile
+import os
 
-DATA_PATH = "data/profiles.csv"
+st.set_page_config(page_title="Student Profile App", layout="centered")
 
-def save_profile(username, name, email, phone, degree, institute, graduation_year, projects, skills, certificates, linkedin, github):
-    os.makedirs("data", exist_ok=True)
-    profile = {
-        "Username": username,
-        "Name": name,
-        "Email": email,
-        "Phone": phone,
-        "Degree": degree,
-        "Institute": institute,
-        "Graduation Year": graduation_year,
-        "Projects": projects,
-        "Skills": skills,
-        "Certificates": certificates,
-        "LinkedIn": linkedin,
-        "GitHub": github
-    }
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.username = ""
 
-    df = pd.DataFrame([profile])
-    if os.path.exists(DATA_PATH):
-        df.to_csv(DATA_PATH, mode='a', header=False, index=False)
+# Login / Signup
+def login_page():
+    st.image("assets/profile_banner.jpg", use_column_width=True)
+    choice = st.radio("Login or Sign Up", ["Login", "Sign Up"])
+    
+    if choice == "Login":
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        if st.button("Login"):
+            if login_user(username, password):
+                st.session_state.logged_in = True
+                st.session_state.username = username
+                st.success("Login successful!")
+                st.rerun()
+            else:
+                st.error("Invalid credentials")
     else:
-        df.to_csv(DATA_PATH, index=False)
+        username = st.text_input("Choose Username")
+        password = st.text_input("Choose Password", type="password")
+        if st.button("Sign Up"):
+            if check_user_exists(username):
+                st.warning("Username already exists!")
+            else:
+                signup_user(username, password)
+                st.success("Signup successful! Please login now.")
 
-def load_profiles(username=None):
-    if os.path.exists(DATA_PATH):
-        df = pd.read_csv(DATA_PATH)
-        if username:
-            return df[df["Username"] == username]
-        return df
-    else:
-        return pd.DataFrame()
+# Main App
+def main_app():
+    st.sidebar.success(f"Logged in as: {st.session_state.username}")
+    menu = st.sidebar.selectbox(
+        "Navigation",
+        ["Create Profile", "View Profile", "View All Profiles", "Logout"]
+    )
 
-def display_profile(profile):
-    st.markdown(f"### 👤 {profile['Full Name']}")
-    st.markdown(f"- **Email**: {profile['Email']}")
-    st.markdown(f"- **Phone**: {profile['Phone']}")
-    st.markdown(f"- **Degree**: {profile['Degree']}")
-    st.markdown(f"- **Institute**: {profile['Institute']}")
-    st.markdown(f"- **Graduation Year**: {profile['Graduation Year']}")
-    st.markdown(f"#### 💼 Projects")
-    st.markdown(f"{profile['Projects'].replace(';', '<br>')}", unsafe_allow_html=True)
-    st.markdown(f"#### 🛠 Skills")
-    st.markdown(f"{', '.join([s.strip() for s in profile['Skills'].split(',')])}")
-    st.markdown(f"#### 📜 Certificates")
-    st.markdown(f"{profile['Certificates'].replace(';', '<br>')}", unsafe_allow_html=True)
-    if profile['LinkedIn']:
-        st.markdown(f"🔗[LinkedIn]({profile['LinkedIn']})")
-    if profile['GitHub']:
-        st.markdown(f"🐙[GitHub]({profile['GitHub']})")
+    if menu == "Create Profile":
+        st.header("📘 Create Your Profile")
+        with st.form("profile_form", clear_on_submit=True):
+            name = st.text_input("Full Name")
+            email = st.text_input("Email")
+            phone = st.text_input("Phone Number")
+            degree = st.selectbox("Degree", ["B.Tech", "B.Sc", "B.Com", "M.Tech", "M.Sc", "MBA", "Other"])
+            institute = st.text_input("Institution")
+            graduation_year = st.number_input("Graduation Year", min_value=2000, max_value=2100, value=2025)
+            projects = st.text_area("Projects (Separate by semicolon)")
+            skills = st.text_area("Skills (Separate by comma)")
+            certificates = st.text_area("Certificates (Separate by semicolon)")
+            linkedin = st.text_input("LinkedIn URL")
+            github = st.text_input("GitHub URL")
+            submitted = st.form_submit_button("Save Profile")
+
+            if submitted:
+                save_profile(
+                    st.session_state.username, name, email, phone, degree,
+                    institute, graduation_year, projects, skills,
+                    certificates, linkedin, github
+                )
+                st.success("✅ Profile saved!")
+
+    elif menu == "View Profile":
+        st.header("📄 Your Profile")
+        df = load_profiles(st.session_state.username)
+        if df.empty:
+            st.info("No profile found. Create one first.")
+        else:
+            display_profile(df.iloc[-1])
+
+    elif menu == "View All Profiles":
+        st.header("👥 All Student Profiles")
+        all_profiles = load_all_profiles()
+        if all_profiles.empty:
+            st.info("No profiles found.")
+        else:
+            st.dataframe(all_profiles)
+
+    elif menu == "Logout":
+        st.session_state.logged_in = False
+        st.session_state.username = ""
+        st.success("Logged out successfully.")
+        st.rerun()
+
+if st.session_state.logged_in:
+    main_app()
+else:
+    login_page()
